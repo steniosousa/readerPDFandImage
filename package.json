@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "module": "CommonJS",
   "scripts": {
     "start": "nodemon ./src/index.js"
   },
@@ -16,7 +17,10 @@
     "express": "^4.18.2",
     "file-type": "^18.5.0",
     "multer": "^1.4.5-lts.1",
+    "nodemon": "^3.1.4",
     "pdf-img-convert": "^1.2.1",
+    "pdf-parse": "^1.1.1",
+    "pdfjs-dist": "^4.4.168",
     "tesseract.js": "^4.1.1"
   }
 }

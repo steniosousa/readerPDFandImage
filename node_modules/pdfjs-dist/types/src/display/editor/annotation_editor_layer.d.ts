@@ -1,17 +1,24 @@
-export type AnnotationEditor = import("./editor.js").AnnotationEditor;
 export type AnnotationEditorUIManager = import("./tools.js").AnnotationEditorUIManager;
-export type AnnotationStorage = import("../annotation_storage.js").AnnotationStorage;
-export type TextAccessibilityManager = any;
-export type IL10n = any;
+export type PageViewport = import("../display_utils.js").PageViewport;
+export type TextAccessibilityManager = import("../../../web/text_accessibility.js").TextAccessibilityManager;
+export type IL10n = import("../../../web/interfaces").IL10n;
+export type AnnotationLayer = import("../annotation_layer.js").AnnotationLayer;
+export type DrawLayer = import("../draw_layer.js").DrawLayer;
 export type AnnotationEditorLayerOptions = {
     mode: Object;
     div: HTMLDivElement;
     uiManager: AnnotationEditorUIManager;
     enabled: boolean;
-    annotationStorage: AnnotationStorage;
-    accessibilityManager?: any;
+    accessibilityManager?: import("../../../web/text_accessibility.js").TextAccessibilityManager | undefined;
     pageIndex: number;
-    l10n: any;
+    l10n: IL10n;
+    annotationLayer?: import("../annotation_layer.js").AnnotationLayer | undefined;
+    textLayer?: HTMLDivElement | undefined;
+    drawLayer: DrawLayer;
+    viewport: PageViewport;
+};
+export type RenderEditorLayerOptions = {
+    viewport: PageViewport;
 };
 /**
  * @typedef {Object} AnnotationEditorLayerOptions
@@ -19,23 +26,34 @@ export type AnnotationEditorLayerOptions = {
  * @property {HTMLDivElement} div
  * @property {AnnotationEditorUIManager} uiManager
  * @property {boolean} enabled
- * @property {AnnotationStorage} annotationStorage
  * @property {TextAccessibilityManager} [accessibilityManager]
  * @property {number} pageIndex
  * @property {IL10n} l10n
+ * @property {AnnotationLayer} [annotationLayer]
+ * @property {HTMLDivElement} [textLayer]
+ * @property {DrawLayer} drawLayer
+ * @property {PageViewport} viewport
+ */
+/**
+ * @typedef {Object} RenderEditorLayerOptions
+ * @property {PageViewport} viewport
  */
 /**
  * Manage all the different editors on a page.
  */
 export class AnnotationEditorLayer {
     static _initialized: boolean;
+    static "__#28@#editorTypes": Map<number, typeof FreeTextEditor | typeof HighlightEditor | typeof InkEditor | typeof StampEditor>;
     /**
      * @param {AnnotationEditorLayerOptions} options
      */
-    constructor(options: AnnotationEditorLayerOptions);
-    annotationStorage: import("../annotation_storage.js").AnnotationStorage;
+    constructor({ uiManager, pageIndex, div, accessibilityManager, annotationLayer, drawLayer, textLayer, viewport, l10n, }: AnnotationEditorLayerOptions);
     pageIndex: number;
     div: HTMLDivElement;
+    viewport: import("../display_utils.js").PageViewport;
+    drawLayer: import("../draw_layer.js").DrawLayer;
+    get isEmpty(): boolean;
+    get isInvisible(): boolean;
     /**
      * Update the toolbar if it's required to reflect the tool currently used.
      * @param {number} mode
@@ -46,6 +64,7 @@ export class AnnotationEditorLayer {
      * @param {number} mode
      */
     updateMode(mode?: number): void;
+    hasTextLayer(textLayer: any): boolean;
     addInkEditorIfNeeded(isCommitting: any): void;
     /**
      * Set the editing state.
@@ -57,6 +76,8 @@ export class AnnotationEditorLayer {
      * @param {Object} params
      */
     addCommands(params: Object): void;
+    togglePointerEvents(enabled?: boolean): void;
+    toggleAnnotationLayerPointerEvents(enabled?: boolean): void;
     /**
      * Enable pointer events on the main div in order to enable
      * editor creation.
@@ -66,11 +87,14 @@ export class AnnotationEditorLayer {
      * Disable editor creation.
      */
     disable(): void;
+    getEditableAnnotation(id: any): any;
     /**
      * Set the current editor.
      * @param {AnnotationEditor} editor
      */
     setActiveEditor(editor: AnnotationEditor): void;
+    enableTextSelection(): void;
+    disableTextSelection(): void;
     enableClick(): void;
     disableClick(): void;
     attach(editor: any): void;
@@ -81,26 +105,22 @@ export class AnnotationEditorLayer {
      */
     remove(editor: AnnotationEditor): void;
     /**
+     * An editor can have a different parent, for example after having
+     * being dragged and droped from a page to another.
+     * @param {AnnotationEditor} editor
+     */
+    changeParent(editor: AnnotationEditor): void;
+    /**
      * Add a new editor in the current view.
      * @param {AnnotationEditor} editor
      */
     add(editor: AnnotationEditor): void;
     moveEditorInDOM(editor: any): void;
     /**
-     * Add an editor in the annotation storage.
-     * @param {AnnotationEditor} editor
-     */
-    addToAnnotationStorage(editor: AnnotationEditor): void;
-    /**
      * Add or rebuild depending if it has been removed or not.
      * @param {AnnotationEditor} editor
      */
     addOrRebuild(editor: AnnotationEditor): void;
-    /**
-     * Add a new editor and make this addition undoable.
-     * @param {AnnotationEditor} editor
-     */
-    addANewEditor(editor: AnnotationEditor): void;
     /**
      * Add a new editor and make this addition undoable.
      * @param {AnnotationEditor} editor
@@ -111,12 +131,32 @@ export class AnnotationEditorLayer {
      * @returns {string}
      */
     getNextId(): string;
+    get _signal(): AbortSignal;
+    canCreateNewEmptyEditor(): boolean | undefined;
+    /**
+     * Paste some content into a new editor.
+     * @param {number} mode
+     * @param {Object} params
+     */
+    pasteEditor(mode: number, params: Object): void;
     /**
      * Create a new editor
      * @param {Object} data
+     * @returns {AnnotationEditor | null}
+     */
+    deserialize(data: Object): AnnotationEditor | null;
+    /**
+     * Create and add a new editor.
+     * @param {PointerEvent} event
+     * @param {boolean} isCentered
+     * @param [Object] data
      * @returns {AnnotationEditor}
      */
-    deserialize(data: Object): AnnotationEditor;
+    createAndAddNewEditor(event: PointerEvent, isCentered: boolean, data?: {}): AnnotationEditor;
+    /**
+     * Create and add a new editor.
+     */
+    addNewEditor(): void;
     /**
      * Set the last selected editor.
      * @param {AnnotationEditor} editor
@@ -148,44 +188,37 @@ export class AnnotationEditorLayer {
      */
     pointerdown(event: PointerEvent): void;
     /**
-     * Drag callback.
-     * @param {DragEvent} event
+     *
+     * @param {AnnotationEditor} editor
+     * @param {number} x
+     * @param {number} y
+     * @returns
      */
-    drop(event: DragEvent): void;
-    /**
-     * Dragover callback.
-     * @param {DragEvent} event
-     */
-    dragover(event: DragEvent): void;
+    findNewParent(editor: AnnotationEditor, x: number, y: number): boolean;
     /**
      * Destroy the main editor.
      */
     destroy(): void;
     /**
      * Render the main editor.
-     * @param {Object} parameters
+     * @param {RenderEditorLayerOptions} parameters
      */
-    render(parameters: Object): void;
-    viewport: any;
+    render({ viewport }: RenderEditorLayerOptions): void;
     /**
      * Update the main editor.
-     * @param {Object} parameters
+     * @param {RenderEditorLayerOptions} parameters
      */
-    update(parameters: Object): void;
-    /**
-     * Get the scale factor from the viewport.
-     * @returns {number}
-     */
-    get scaleFactor(): number;
+    update({ viewport }: RenderEditorLayerOptions): void;
     /**
      * Get page dimensions.
      * @returns {Object} dimensions.
      */
     get pageDimensions(): Object;
-    get viewportBaseDimensions(): any[];
-    /**
-     * Set the dimensions of the main div.
-     */
-    setDimensions(): void;
+    get scale(): number;
     #private;
 }
+import { AnnotationEditor } from "./editor.js";
+import { FreeTextEditor } from "./freetext.js";
+import { HighlightEditor } from "./highlight.js";
+import { InkEditor } from "./ink.js";
+import { StampEditor } from "./stamp.js";
