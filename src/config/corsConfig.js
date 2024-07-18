@@ -1,11 +1,10 @@
+
 const cors = require('cors');
 
 const corsOptions = {
-  origin: 'http://localhost:4200',
-  methods: 'POST',
-  credentials: false
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
 };
 
-const corsConfig = cors(corsOptions);
-
-module.exports = corsConfig;
+module.exports = cors(corsOptions);
