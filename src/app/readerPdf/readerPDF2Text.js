@@ -49,12 +49,11 @@ class PdfController {
             const tipo = /ESPÉCIE(.*?)MARCA/s
             const matchTipo = data.text.match(tipo)
 
-            const localização = /DESTINATÁRIO:(.*?)NF-e/s
+            const localização = new RegExp(`${matchUsuario[1].trim()}(.*?)NF-e`,"s")
             const matchLocalização = data.text.match(localização)
 
-            const cpfCnpj = /CPF(.*?)DATA DA EMISSÃO/s
+            const cpfCnpj = new RegExp(`${matchUsuario[1].trim()}\nCNPJ / CPF(.*?)DATA DA EMISSÃO\n`, "s")
             const matchCnpj = data.text.match(cpfCnpj)
-
             const incrição = /INSCRIÇÃO ESTADUAL\n([0-9]+)/;
             const matchIncrição = data.text.match(incrição)
             if (matchUsuario) {
@@ -87,7 +86,6 @@ class PdfController {
 
             if (matchCnpj) {
                 const cnpj = matchCnpj[1].trim()
-
                 obj["cnpj*"] = cnpj
             }
 
@@ -96,9 +94,9 @@ class PdfController {
                 obj["Incrição estadual*"] = incriçãoEstadual
             }
 
+            return obj
 
 
-            return obj;
         } catch (error) {
             console.error('Error reading PDF:', error);
             throw error;
